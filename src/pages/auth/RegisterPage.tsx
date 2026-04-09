@@ -6,6 +6,41 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { UserRole } from '../../types';
 
+// Password strength and suggestions
+const getPasswordStrength = (password: string) => {
+  let score = 0;
+  const suggestions: string[] = [];
+
+  if (!password) return { score: 0, label: "", suggestions };
+
+  // Length
+  if (password.length >= 8) score++;
+  else suggestions.push("At least 8 characters");
+
+  // Uppercase
+  if (/[A-Z]/.test(password)) score++;
+  else suggestions.push("Add an uppercase letter");
+
+  // Lowercase
+  if (/[a-z]/.test(password)) score++;
+  else suggestions.push("Add a lowercase letter");
+
+  // Numbers
+  if (/[0-9]/.test(password)) score++;
+  else suggestions.push("Add a number");
+
+  // Special chars
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+  else suggestions.push("Add a special character");
+
+  let label = "";
+  if (score <= 2) label = "Weak";
+  else if (score <= 4) label = "Medium";
+  else label = "Strong";
+
+  return { score, label, suggestions };
+};
+
 export const RegisterPage: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -14,32 +49,32 @@ export const RegisterPage: React.FC = () => {
   const [role, setRole] = useState<UserRole>('entrepreneur');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const { register } = useAuth();
   const navigate = useNavigate();
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
-    // Validate passwords match
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     try {
       await register(name, email, password, role);
-      // Redirect based on user role
       navigate(role === 'entrepreneur' ? '/dashboard/entrepreneur' : '/dashboard/investor');
     } catch (err) {
       setError((err as Error).message);
       setIsLoading(false);
     }
   };
-  
+
+  const passwordStrength = getPasswordStrength(password);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -131,6 +166,46 @@ export const RegisterPage: React.FC = () => {
               fullWidth
               startAdornment={<Lock size={18} />}
             />
+
+            {/* Password Strength Meter */}
+            <div className="mt-2">
+              <div className="h-2 w-full bg-gray-200 rounded">
+                <div
+                  className={`h-2 rounded transition-all duration-300 ${
+                    passwordStrength.score <= 2
+                      ? "bg-red-500 w-1/3"
+                      : passwordStrength.score <= 4
+                      ? "bg-yellow-500 w-2/3"
+                      : "bg-green-500 w-full"
+                  }`}
+                ></div>
+              </div>
+
+              {password && (
+                <>
+                  <p
+                    className={`text-sm mt-1 ${
+                      passwordStrength.label === "Weak"
+                        ? "text-red-500"
+                        : passwordStrength.label === "Medium"
+                        ? "text-yellow-500"
+                        : "text-green-500"
+                    }`}
+                  >
+                    Password strength: {passwordStrength.label}
+                  </p>
+
+                  {/* Live suggestions */}
+                  {passwordStrength.suggestions.length > 0 && (
+                    <ul className="text-xs text-gray-500 mt-1 list-disc list-inside">
+                      {passwordStrength.suggestions.map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+            </div>
             
             <Input
               label="Confirm password"
@@ -161,11 +236,12 @@ export const RegisterPage: React.FC = () => {
                 </a>
               </label>
             </div>
-            
+
             <Button
               type="submit"
               fullWidth
               isLoading={isLoading}
+              disabled={passwordStrength.label === "Weak"} // Disable weak passwords
             >
               Create account
             </Button>
